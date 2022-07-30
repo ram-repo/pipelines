@@ -1,0 +1,38 @@
+pipeline{  
+    agent any
+    stages{
+        stage('Docker Build') {
+            steps {
+                sh '''cat << EOF > Dockerfile
+FROM maven:3-jdk-11 As builder
+LABEL author=Surya
+RUN git clone https://github.com/spring-projects/spring-petclinic.git && cd spring-petclinic && mvn clean package
+
+FROM openjdk:11.0-jdk
+COPY --from=builder spring-petclinic/target/spring-petclinic-2.7.0-SNAPSHOT.jar /spring/spring-petclinic.jar
+WORKDIR spring
+EXPOSE 8080
+CMD ["java","-jar","spring-petclinic.jar"]    
+EOF'''
+                sh 'docker build -t spring-petclinic:latest .'
+      }
+    }
+        stage('Pushing Image to DockerHub with Versioning') {
+            steps {
+            //     withCredentials([usernamePassword(credentialsId: 'dockerHub', passwordVariable: 'dockerHubPassword', usernameVariable: 'dockerHubUser')]) {
+           //       sh "sudo docker login -u ${env.dockerHubUser} -p ${env.dockerHubPassword}"
+                sh 'sudo docker tag spring-petclinic:latest optimussurya/spring-petclinic:$BUILD_NUMBER'
+                sh 'sudo docker push optimussurya/spring-petclinic:$BUILD_NUMBER'
+                sh 'sudo docker tag spring-petclinic:latest optimussurya/spring-petclinic:latest'
+                sh 'sudo docker push optimussurya/spring-petclinic:latest'
+          //  }
+          }
+        }
+        /*
+        stage('Deploying application'){
+            steps{
+                   sh 'kubectl apply -f spc-dev.yaml'
+                }
+        }*/
+    }
+}
